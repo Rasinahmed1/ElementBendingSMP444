@@ -64,7 +64,7 @@ public class ElementBendingSMP extends JavaPlugin implements Listener {
             }
 
             case "WATER" -> {
-                p.getWorld().spawnParticle(Particle.SPLASH, p.getLocation(), 30);
+                p.getWorld().spawnParticle(Particle.WATER_SPLASH, p.getLocation(), 30);
                 setCooldown(p, 2000);
             }
 
