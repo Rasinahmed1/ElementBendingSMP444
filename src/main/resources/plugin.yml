@@ -1,8 +1,10 @@
-name: UltraAvatarBending
+name: GodBenders
 version: 1.0
 main: com.elementbending.ElementBendingSMP
 api-version: 1.20
 
 commands:
   bending:
-    description: Open Avatar Bending GUI
+    description: Open abilities
+  element:
+    description: Choose element
