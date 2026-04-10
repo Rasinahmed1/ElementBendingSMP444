@@ -1,7 +1,8 @@
 package com.elementbending;
 
 import org.bukkit.*;
-import org.bukkit.entity.Player;
+import org.bukkit.command.*;
+import org.bukkit.entity.*;
 import org.bukkit.event.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -21,7 +22,7 @@ public class ElementBendingSMP extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("ElementBendingSMP Enabled!");
+        getLogger().info("ElementBendingSMP ENABLED SAFE MODE ✔");
     }
 
     // ---------------- GUI ----------------
@@ -29,39 +30,44 @@ public class ElementBendingSMP extends JavaPlugin implements Listener {
 
         Inventory gui = Bukkit.createInventory(null, 9, "§6Select Bending");
 
-        gui.setItem(0, item(Material.BLAZE_POWDER, "§cFire"));
-        gui.setItem(2, item(Material.WATER_BUCKET, "§9Water"));
-        gui.setItem(4, item(Material.DIRT, "§2Earth"));
-        gui.setItem(6, item(Material.FEATHER, "§fAir"));
+        gui.setItem(0, createItem(Material.BLAZE_POWDER, "§cFire"));
+        gui.setItem(2, createItem(Material.WATER_BUCKET, "§9Water"));
+        gui.setItem(4, createItem(Material.DIRT, "§2Earth"));
+        gui.setItem(6, createItem(Material.FEATHER, "§fAir"));
 
         p.openInventory(gui);
     }
 
-    private ItemStack item(Material mat, String name) {
-        ItemStack i = new ItemStack(mat);
-        ItemMeta meta = i.getItemMeta();
+    private ItemStack createItem(Material mat, String name) {
+
+        ItemStack item = new ItemStack(mat);
+        ItemMeta meta = item.getItemMeta();
+
         if (meta != null) {
             meta.setDisplayName(name);
-            i.setItemMeta(meta);
+            item.setItemMeta(meta);
         }
-        return i;
+
+        return item;
     }
 
-    // ---------------- OPEN GUI COMMAND (RIGHT CLICK ALSO) ----------------
+    // ---------------- SAFE CLICK ----------------
     @EventHandler
     public void onInteract(PlayerInteractEvent e) {
 
+        Player p = e.getPlayer();
+
+        // OPEN GUI (RIGHT CLICK ONLY)
         if (e.getAction() == Action.RIGHT_CLICK_AIR ||
             e.getAction() == Action.RIGHT_CLICK_BLOCK) {
 
-            openGUI(e.getPlayer());
+            openGUI(p);
             return;
         }
 
+        // LEFT CLICK = ABILITY
         if (e.getAction() != Action.LEFT_CLICK_AIR &&
             e.getAction() != Action.LEFT_CLICK_BLOCK) return;
-
-        Player p = e.getPlayer();
 
         if (isCooldown(p)) return;
 
@@ -70,63 +76,100 @@ public class ElementBendingSMP extends JavaPlugin implements Listener {
         switch (type) {
 
             case "FIRE" -> {
-                p.launchProjectile(org.bukkit.entity.Fireball.class);
+                if (p.isDead()) return;
+                p.launchProjectile(Fireball.class);
                 setCooldown(p, 3000);
             }
 
             case "WATER" -> {
-                p.getWorld().spawnParticle(Particle.WATER_SPLASH, p.getLocation(), 20);
+                p.getWorld().spawnParticle(Particle.WATER_SPLASH, p.getLocation(), 15);
                 setCooldown(p, 2000);
             }
 
             case "EARTH" -> {
-                p.getWorld().spawnFallingBlock(
+                FallingBlock block = p.getWorld().spawnFallingBlock(
                         p.getEyeLocation(),
                         Material.STONE.createBlockData()
-                ).setVelocity(p.getLocation().getDirection().multiply(1.5));
+                );
+
+                block.setVelocity(p.getLocation().getDirection().multiply(1.2));
                 setCooldown(p, 2500);
             }
 
             case "AIR" -> {
-                for (var ent : p.getNearbyEntities(4, 4, 4)) {
+                for (Entity ent : p.getNearbyEntities(4, 4, 4)) {
+
+                    if (ent instanceof Player target && target.equals(p)) continue;
+
                     Vector v = ent.getLocation().toVector()
                             .subtract(p.getLocation().toVector())
                             .normalize()
-                            .multiply(1.2);
+                            .multiply(1.1);
+
                     ent.setVelocity(v);
                 }
+
                 setCooldown(p, 1500);
             }
         }
     }
 
-    // ---------------- GUI CLICK ----------------
+    // ---------------- GUI CLICK SAFE ----------------
     @EventHandler
-    public void onClick(InventoryClickEvent e) {
+    public void onGUI(InventoryClickEvent e) {
 
         if (e.getView() == null) return;
         if (!e.getView().getTitle().equals("§6Select Bending")) return;
 
         e.setCancelled(true);
 
-        if (e.getCurrentItem() == null || e.getCurrentItem().getItemMeta() == null) return;
+        if (e.getCurrentItem() == null) return;
+        if (!e.getCurrentItem().hasItemMeta()) return;
 
         Player p = (Player) e.getWhoClicked();
-
         String name = e.getCurrentItem().getItemMeta().getDisplayName();
+
+        if (name == null) return;
 
         switch (name) {
             case "§cFire" -> bending.put(p.getUniqueId(), "FIRE");
             case "§9Water" -> bending.put(p.getUniqueId(), "WATER");
             case "§2Earth" -> bending.put(p.getUniqueId(), "EARTH");
             case "§fAir" -> bending.put(p.getUniqueId(), "AIR");
+            default -> {
+                p.sendMessage("§cInvalid selection!");
+                return;
+            }
         }
 
-        p.sendMessage("§aSelected: §e" + name);
+        p.sendMessage("§aBending selected: §e" + name);
         p.closeInventory();
     }
 
-    // ---------------- COOLDOWN ----------------
+    // ---------------- SAFE COMMANDS ----------------
+    @Override
+    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+
+        if (!(sender instanceof Player p)) {
+            sender.sendMessage("Players only.");
+            return true;
+        }
+
+        if (cmd.getName().equalsIgnoreCase("bending")) {
+            openGUI(p);
+            return true;
+        }
+
+        if (cmd.getName().equalsIgnoreCase("mybending")) {
+            String type = bending.getOrDefault(p.getUniqueId(), "NONE");
+            p.sendMessage("§6Your bending: §e" + type);
+            return true;
+        }
+
+        return false;
+    }
+
+    // ---------------- COOLDOWN SAFE ----------------
     private boolean isCooldown(Player p) {
         return cooldown.getOrDefault(p.getUniqueId(), 0L) > System.currentTimeMillis();
     }
@@ -134,4 +177,4 @@ public class ElementBendingSMP extends JavaPlugin implements Listener {
     private void setCooldown(Player p, long ms) {
         cooldown.put(p.getUniqueId(), System.currentTimeMillis() + ms);
     }
-                    }
+    }
