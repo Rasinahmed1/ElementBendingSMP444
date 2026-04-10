@@ -2,4 +2,9 @@ name: ElementBendingSMP
 version: 1.0
 main: com.elementbending.ElementBendingSMP
 api-version: 1.20
-author: MINMO PlayzYT
+
+commands:
+  bending:
+    description: Open bending GUI
+  mybending:
+    description: Show your bending type
